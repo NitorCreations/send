@@ -114,6 +114,16 @@ function SendStream(req, path, options) {
     ? normalizeList(opts.extensions, 'extensions option')
     : []
 
+  if (Array.isArray(opts.precompressed)) {
+    this._precompressionFormats = opts.precompressed
+  } else if (opts.precompressed) {
+    this._precompressionFormats = [{encoding: 'br', extension:'.br'}, {encoding:'gzip', extension:'.gz'}]
+  }
+
+  this._precompressionFormats = opts.precompressionFormats !== undefined
+      ? opts.precompressionFormats
+      : this._precompressionFormats
+
   this._index = opts.index !== undefined
     ? normalizeList(opts.index, 'index option')
     : ['index.html']
@@ -282,6 +292,24 @@ SendStream.prototype.hasTrailingSlash = function(){
 SendStream.prototype.isConditionalGET = function(){
   return this.req.headers['if-none-match']
     || this.req.headers['if-modified-since'];
+};
+
+/**
+ * Return the array of file precompressed file extensions to serve in preference order.
+ *
+ * @return {Array}
+ * @api private
+ */
+
+SendStream.prototype.getAcceptEncodingExtensions = function() {
+  var accepted = []
+  var header = this.req.headers['accept-encoding']
+  if (header) {
+    this._precompressionFormats.forEach(function (format) {
+      if (header.indexOf(format.encoding) >= 0) accepted.push(format.extension)
+    })
+  }
+  return accepted;
 };
 
 /**
@@ -511,8 +539,10 @@ SendStream.prototype.pipe = function(res){
  * @api public
  */
 
-SendStream.prototype.send = function(path, stat){
-  var len = stat.size;
+SendStream.prototype.send = function(path, stat, contentPath, contentStat) {
+  contentStat = contentStat || stat
+  contentPath = contentPath || path
+  var len = contentStat.size;
   var options = this.options
   var opts = {}
   var res = this.res;
@@ -525,7 +555,7 @@ SendStream.prototype.send = function(path, stat){
     return this.headersAlreadySent();
   }
 
-  debug('pipe "%s"', path)
+  debug('pipe "%s"', contentPath)
 
   // set header fields
   this.setHeader(path, stat);
@@ -560,7 +590,7 @@ SendStream.prototype.send = function(path, stat){
     // unsatisfiable
     if (-1 == ranges) {
       debug('range unsatisfiable');
-      res.setHeader('Content-Range', 'bytes */' + stat.size);
+      res.setHeader('Content-Range', 'bytes */' + contentStat.size);
       return this.error(416);
     }
 
@@ -597,7 +627,7 @@ SendStream.prototype.send = function(path, stat){
   // HEAD support
   if ('HEAD' == req.method) return res.end();
 
-  this.stream(path, opts)
+  this.stream(contentPath, opts)
 };
 
 /**
@@ -620,8 +650,7 @@ SendStream.prototype.sendFile = function sendFile(path) {
     }
     if (err) return self.onStatError(err)
     if (stat.isDirectory()) return self.redirect(self.path)
-    self.emit('file', path, stat)
-    self.send(path, stat)
+    checkPrecompressionAndSendFile(path, stat)
   })
 
   function next(err) {
@@ -637,9 +666,46 @@ SendStream.prototype.sendFile = function sendFile(path) {
     fs.stat(p, function (err, stat) {
       if (err) return next(err)
       if (stat.isDirectory()) return next()
-      self.emit('file', p, stat)
-      self.send(p, stat)
+      checkPrecompressionAndSendFile(p, stat)
     })
+  }
+
+  function checkPrecompressionAndSendFile(p, stat) {
+    self.emit('file', p, stat)
+    if (!self._precompressionFormats) return self.send(p, stat)
+
+    var state = {
+      contents: [],
+      extensionsToCheck: self._precompressionFormats.length
+    }
+
+    self._precompressionFormats.forEach(function (format) {
+      debug('stat "%s%s"', p, format.extension);
+      fs.stat(p + format.extension, function onstat(err, contentStat) {
+        if (!err) state.contents.push({ext: format.extension, encoding: format.encoding, contentStat: contentStat})
+        if (--state.extensionsToCheck == 0) sendPreferredContent(p, stat, state.contents)
+      })
+    })
+  }
+
+  function sendPreferredContent(p, stat, contents) {
+    if (contents.length) self.res.setHeader('Vary', 'Accept-Encoding')
+
+    var preferredContent
+    var extensions = self.getAcceptEncodingExtensions()
+    for (var e = 0; e < extensions.length && !preferredContent; e++) {
+      for (var c = 0; c < contents.length; c++) {
+        if (extensions[e] === contents[c].ext) {
+          preferredContent = contents[c]
+          break
+        }
+      }
+    }
+
+    if (!preferredContent) return self.send(p, stat)
+
+    self.res.setHeader('Content-Encoding', preferredContent.encoding)
+    self.send(p, stat, p + preferredContent.ext, preferredContent.contentStat)
   }
 }
 

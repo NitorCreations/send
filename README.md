@@ -85,6 +85,12 @@ Provide a max-age in milliseconds for http caching, defaults to 0.
 This can also be a string accepted by the
 [ms](https://www.npmjs.org/package/ms#readme) module.
 
+##### precompressed
+
+Enable or disable serving of precompressed content, defaults to `false`.
+If set to `true` checks for brotli and gzip. An example value to serve
+other formats: `[{encoding: 'bzip2', extension: '.bz2'}]`
+
 ##### root
 
 Serve files relative to `path`.

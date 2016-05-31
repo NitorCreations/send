@@ -87,9 +87,40 @@ This can also be a string accepted by the
 
 ##### precompressed
 
-Enable or disable serving of precompressed content, defaults to `false`.
-If set to `true` checks for brotli and gzip. An example value to serve
-other formats: `[{encoding: 'bzip2', extension: '.bz2'}]`
+Precompressed files are extra static files that are compressed before
+they are requested, as opposed to compressing on the fly. Compressing
+files once offline (for example during site build) allows using
+stronger compression methods and both reduces latency and lowers cpu
+usage when serving files.
+
+The 'precompressed` option enables or disables serving of precompressed
+content variants. The option defaults to `false`, if set to `true` checks
+for existence of brotli and gzip compressed files with `.br` and `.gz`
+extensions, preferring brotli if the file exists and supported by the
+browser.
+
+Example scenario:
+
+The file `site.css` has both `site.css.gz` and `site.css.br`
+precompressed versions available in the same directory.
+When a request comes with an `Accept-Encoding` header with value `gzip, br`
+requesting `site.css` the contents of `site.css.br` is sent instead and
+a header `Content-Encoding` with value `br` is added to the response.
+In addition a `Vary: Accept-Encoding` header is added to response allowing
+proxies to work correctly.
+
+Custom configuration:
+
+It is also possible to customize the searched file extensions and header
+values (used with Accept-Encoding and Content-Encoding headers) by specifying
+them explicitly in an array in the preferred priority order. For example:
+`[{encoding: 'bzip2', extension: '.bz2'}, {encoding: 'gzip', extension: '.gz'}]`.
+
+Compression tips:
+   * Precompress at least all static `js`, `css`  and `svg` files.
+   * Precompress using both brotli (supported by Firefox and Chrome) and
+     gzip encoders.
+   * Use zopfli for gzip compression for and extra 5% benefit for all browsers.
 
 ##### root
 

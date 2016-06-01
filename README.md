@@ -93,7 +93,7 @@ files once offline (for example during site build) allows using
 stronger compression methods and both reduces latency and lowers cpu
 usage when serving files.
 
-The 'precompressed` option enables or disables serving of precompressed
+The `precompressed` option enables or disables serving of precompressed
 content variants. The option defaults to `false`, if set to `true` checks
 for existence of brotli and gzip compressed files with `.br` and `.gz`
 extensions, preferring brotli if the file exists and supported by the

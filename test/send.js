@@ -1150,6 +1150,19 @@ describe('send(file, options)', function(){
           .expect('Content-Length', '11', done)
     })
 
+    it('should not send gzip when no-gzip encoding is used', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: true, root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', 'no-gzip, deflate')
+          .expect('Content-Length', '11')
+          .expect('Vary', 'Accept-Encoding', done)
+    })
+
     it('should consider empty array of precompressed configuration as disabled', function(done){
       var app = http.createServer(function(req, res){
         send(req, req.url, {precompressed: [], root: fixtures})

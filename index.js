@@ -308,7 +308,10 @@ SendStream.prototype.getAcceptEncodingExtensions = function() {
   var header = this.req.headers['accept-encoding']
   if (header) {
     this._precompressionFormats.forEach(function (format) {
-      if (header.indexOf(format.encoding) >= 0) accepted.push(format.extension)
+      header.split(',').forEach(function (reqEncoding) {
+        if (reqEncoding.trim().indexOf(format.encoding) === 0)
+          accepted.push(format.extension)
+      })
     })
   }
   return accepted;

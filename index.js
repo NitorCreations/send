@@ -694,7 +694,11 @@ SendStream.prototype.sendFile = function sendFile(path) {
   }
 
   function sendPreferredContent(p, stat, contents) {
-    if (contents.length) self.res.setHeader('Vary', 'Accept-Encoding')
+    if (contents.length) {
+      var old = self.res.getHeader('Vary')
+      var value = (old ? old + ', ' : '') + 'Accept-Encoding'
+      self.res.setHeader('Vary', value)
+    }
 
     var preferredContent
     var extensions = self.getAcceptEncodingExtensions()

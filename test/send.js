@@ -1174,6 +1174,16 @@ describe('send(file, options)', function(){
           .set('Accept-Encoding', 'gzip')
           .expect('Content-Length', '11', done)
     })
+
+    it('should append to existing Vary header', function(done){
+      var app = http.createServer(function(req, res){
+        res.setHeader('Vary', 'custom')
+        send(req, req.url, {precompressed: true, root: fixtures}).pipe(res)
+      });
+      request(app)
+         .get('/name.html')
+         .expect('Vary', 'custom, Accept-Encoding', done);
+    })
   })
 
   describe('index', function(){

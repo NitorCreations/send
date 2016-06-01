@@ -1149,6 +1149,18 @@ describe('send(file, options)', function(){
           .expect('Content-Type', 'text/html; charset=UTF-8')
           .expect('Content-Length', '11', done)
     })
+
+    it('should consider empty array of precompressed configuration as disabled', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: [], root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', 'gzip')
+          .expect('Content-Length', '11', done)
+    })
   })
 
   describe('index', function(){

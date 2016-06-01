@@ -115,7 +115,9 @@ function SendStream(req, path, options) {
     : []
 
   if (Array.isArray(opts.precompressed)) {
-    this._precompressionFormats = opts.precompressed
+    if (opts.precompressed.length > 0) {
+      this._precompressionFormats = opts.precompressed
+    }
   } else if (opts.precompressed) {
     this._precompressionFormats = [{encoding: 'br', extension:'.br'}, {encoding:'gzip', extension:'.gz'}]
   }

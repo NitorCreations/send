@@ -1087,6 +1087,7 @@ describe('send(file, options)', function(){
           .get('/name.txt')
           .set('Accept-Encoding', 'gzip')
           .expect(shouldNotHaveHeader('Vary'))
+          .expect(shouldNotHaveHeader('Content-Encoding'))
           .expect(200, done)
     })
 
@@ -1100,6 +1101,7 @@ describe('send(file, options)', function(){
           .get('/name.html')
           .set('Accept-Encoding', '')
           .expect('Content-Length', '11')
+          .expect(shouldNotHaveHeader('Content-Encoding'))
           .expect('Content-Type', 'text/html; charset=UTF-8')
           .expect('Vary', 'Accept-Encoding', done)
     })
@@ -1172,6 +1174,7 @@ describe('send(file, options)', function(){
       request(app)
           .get('/name.html')
           .set('Accept-Encoding', 'gzip')
+          .expect(shouldNotHaveHeader('Content-Encoding'))
           .expect('Content-Length', '11', done)
     })
 
@@ -1183,6 +1186,51 @@ describe('send(file, options)', function(){
       request(app)
          .get('/name.html')
          .expect('Vary', 'custom, Accept-Encoding', done);
+    })
+
+    it('should honour accept-encoding quality values', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: true, root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', 'gzip;q=0.9, deflate;q=1, br;q=0.1')
+          .expect('Vary', 'Accept-Encoding')
+          .expect('Content-Encoding', 'gzip')
+          .expect('Content-Type', 'text/html; charset=UTF-8')
+          .expect('Content-Length', '31', done)
+    })
+
+    it('should return no encoding if identity encoding preferred in accept-encoding', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: true, root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', 'gzip;q=0.8, identity')
+          .expect('Vary', 'Accept-Encoding')
+          .expect(shouldNotHaveHeader('Content-Encoding'))
+          .expect('Content-Type', 'text/html; charset=UTF-8')
+          .expect('Content-Length', '11', done)
+    })
+
+    it('should return server preferred format for accept-encoding *', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: true, root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', '*;q=0.9; gzip;q=0.8')
+          .expect('Vary', 'Accept-Encoding')
+          .expect('Content-Encoding', 'br')
+          .expect('Content-Type', 'text/html; charset=UTF-8')
+          .expect('Content-Length', '15', done)
     })
   })
 

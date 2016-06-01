@@ -307,12 +307,26 @@ SendStream.prototype.getAcceptEncodingExtensions = function() {
   var accepted = []
   var header = this.req.headers['accept-encoding']
   if (header) {
-    this._precompressionFormats.forEach(function (format) {
+    var self = this
+    self._precompressionFormats.forEach(function (format) {
       header.split(',').forEach(function (reqEncoding) {
-        if (reqEncoding.trim().indexOf(format.encoding) === 0)
-          accepted.push(format.extension)
+        var vals = reqEncoding.split(';')
+        var quality = 1
+        if (vals.length > 1) {
+          quality = parseFloat(vals[1].split('=')[1])
+        }
+        var encoding = vals[0].trim()
+        if (encoding === 'identity') {
+          accepted.push({format:'identity', quality:quality})
+        } else if (encoding === '*' || encoding.indexOf(format.encoding) === 0) {
+          accepted.push({format:format.extension, quality:quality})
+        }
       })
     })
+    accepted.sort(function(a,b) {return b.quality - a.quality} );
+    if (accepted.length >= 1 && accepted[0].format === 'identity') {
+       accepted = []
+    }
   }
   return accepted;
 };
@@ -704,7 +718,7 @@ SendStream.prototype.sendFile = function sendFile(path) {
     var extensions = self.getAcceptEncodingExtensions()
     for (var e = 0; e < extensions.length && !preferredContent; e++) {
       for (var c = 0; c < contents.length; c++) {
-        if (extensions[e] === contents[c].ext) {
+        if (extensions[e].format === contents[c].ext) {
           preferredContent = contents[c]
           break
         }

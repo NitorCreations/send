@@ -25,7 +25,8 @@
     "ms": "0.7.1",
     "on-finished": "~2.3.0",
     "range-parser": "~1.0.3",
-    "statuses": "~1.2.1"
+    "statuses": "~1.2.1",
+    "vary": "~1.1.0"
   },
   "devDependencies": {
     "after": "0.8.1",

@@ -30,6 +30,7 @@ var EventEmitter = require('events').EventEmitter;
 var ms = require('ms');
 var onFinished = require('on-finished')
 var statuses = require('statuses')
+var vary = require('vary')
 
 /**
  * Variables.
@@ -709,9 +710,7 @@ SendStream.prototype.sendFile = function sendFile(path) {
 
   function sendPreferredContent(p, stat, contents) {
     if (contents.length) {
-      var old = self.res.getHeader('Vary')
-      var value = (old ? old + ', ' : '') + 'Accept-Encoding'
-      self.res.setHeader('Vary', value)
+      vary(self.res, 'Accept-Encoding')
     }
 
     var preferredContent

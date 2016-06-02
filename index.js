@@ -31,6 +31,7 @@ var ms = require('ms');
 var onFinished = require('on-finished')
 var statuses = require('statuses')
 var vary = require('vary')
+var accepts = require('accepts')
 
 /**
  * Variables.
@@ -295,41 +296,6 @@ SendStream.prototype.hasTrailingSlash = function(){
 SendStream.prototype.isConditionalGET = function(){
   return this.req.headers['if-none-match']
     || this.req.headers['if-modified-since'];
-};
-
-/**
- * Return the array of file precompressed file extensions to serve in preference order.
- *
- * @return {Array}
- * @api private
- */
-
-SendStream.prototype.getAcceptEncodingExtensions = function() {
-  var accepted = []
-  var header = this.req.headers['accept-encoding']
-  if (header) {
-    var self = this
-    self._precompressionFormats.forEach(function (format) {
-      header.split(',').forEach(function (reqEncoding) {
-        var vals = reqEncoding.split(';')
-        var quality = 1
-        if (vals.length > 1) {
-          quality = parseFloat(vals[1].split('=')[1])
-        }
-        var encoding = vals[0].trim()
-        if (encoding === 'identity') {
-          accepted.push({format:'identity', quality:quality})
-        } else if (encoding === '*' || encoding.indexOf(format.encoding) === 0) {
-          accepted.push({format:format.extension, quality:quality})
-        }
-      })
-    })
-    accepted.sort(function(a,b) {return b.quality - a.quality} );
-    if (accepted.length >= 1 && accepted[0].format === 'identity') {
-       accepted = []
-    }
-  }
-  return accepted;
 };
 
 /**
@@ -699,10 +665,10 @@ SendStream.prototype.sendFile = function sendFile(path) {
       extensionsToCheck: self._precompressionFormats.length
     }
 
-    self._precompressionFormats.forEach(function (format) {
-      debug('stat "%s%s"', p, format.extension);
+    self._precompressionFormats.forEach(function (format, order) {
+      debug('stat "%s%s"', p, format.extension)
       fs.stat(p + format.extension, function onstat(err, contentStat) {
-        if (!err) state.contents.push({ext: format.extension, encoding: format.encoding, contentStat: contentStat})
+        if (!err) state.contents.push({order: order, ext: format.extension, encoding: format.encoding, contentStat: contentStat})
         if (--state.extensionsToCheck == 0) sendPreferredContent(p, stat, state.contents)
       })
     })
@@ -711,23 +677,24 @@ SendStream.prototype.sendFile = function sendFile(path) {
   function sendPreferredContent(p, stat, contents) {
     if (contents.length) {
       vary(self.res, 'Accept-Encoding')
-    }
 
-    var preferredContent
-    var extensions = self.getAcceptEncodingExtensions()
-    for (var e = 0; e < extensions.length && !preferredContent; e++) {
+      // sort found contents to server preference order
+      contents.sort(function(a,b) {return a.order - b.order})
+      console.log('preferred', contents.map(function (c) {return c.encoding}))
+
+      console.log('accept', self.req.headers['accept-encoding'])	
+      var selectedEncoding = accepts(self.req).encoding()
+      console.log('selectedEncoding', selectedEncoding)
+
       for (var c = 0; c < contents.length; c++) {
-        if (extensions[e].format === contents[c].ext) {
-          preferredContent = contents[c]
-          break
+        if (selectedEncoding === contents[c].encoding) {
+          self.res.setHeader('Content-Encoding', contents[c].encoding)
+          return self.send(p, stat, p + contents[c].ext, contents[c].contentStat)
         }
       }
     }
 
-    if (!preferredContent) return self.send(p, stat)
-
-    self.res.setHeader('Content-Encoding', preferredContent.encoding)
-    self.send(p, stat, p + preferredContent.ext, preferredContent.contentStat)
+    return self.send(p, stat)
   }
 }
 

@@ -1106,9 +1106,10 @@ describe('send(file, options)', function(){
           .expect('Vary', 'Accept-Encoding', done)
     })
 
-    it('should send brotli when present with equal weight in accept-encoding', function(done){
+    it('should prefer server encoding order (br,gzip) when present with equal weight in accept-encoding', function(done){
       var app = http.createServer(function(req, res){
-        send(req, req.url, {precompressed: true, root: fixtures})
+        send(req, req.url, {precompressed: [{encoding: 'br', extension: '.br'},
+                                            {encoding: 'gzip', extension: '.gz'}], root: fixtures})
             .pipe(res);
       });
 
@@ -1120,6 +1121,23 @@ describe('send(file, options)', function(){
           .expect('Content-Type', 'text/html; charset=UTF-8')
           .expect('Content-Length', '15', done)
     })
+
+    it('should prefer server encoding order (gzip,br) when present with equal weight in accept-encoding', function(done){
+      var app = http.createServer(function(req, res){
+        send(req, req.url, {precompressed: [{encoding: 'gzip', extension: '.gz'},
+                                            {encoding: 'br', extension: '.br'}], root: fixtures})
+            .pipe(res);
+      });
+
+      request(app)
+          .get('/name.html')
+          .set('Accept-Encoding', 'br, deflate, gzip')
+          .expect('Vary', 'Accept-Encoding')
+          .expect('Content-Encoding', 'gzip')
+          .expect('Content-Type', 'text/html; charset=UTF-8')
+          .expect('Content-Length', '31', done)
+    })
+
 
     it('should send gzip when preferred in accept-encoding', function(done){
       var app = http.createServer(function(req, res){
